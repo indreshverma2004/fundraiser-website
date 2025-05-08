@@ -25,23 +25,57 @@ const DonatePage: React.FC = () => {
       toast.error("All fields are required");
       return;
     }
-
-    try {
-      const response = await fetch('https://fundraiser-950o.onrender.com/api/users/contribute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, campaignId }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Donation failed");
-
-      toast.success("Donation successful!");
-      navigate(`/campaigns`);
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+  
+    const amountInPaise = parseInt(formData.amount) * 100;
+  
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => {
+      const options = {
+        key: "rzp_test_X5Z3WEj29Kjeew",
+        amount: amountInPaise,
+        currency: "INR",
+        name: "Fundraising Platform",
+        description: `Donation for Campaign`,
+        handler: async (response: any) => {
+          // After payment is successful, call backend to store donation
+          try {
+            const res = await fetch("https://fundraiser-950o.onrender.com/api/users/contribute", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...formData, campaignId, paymentId: response.razorpay_payment_id }),
+            });
+  
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || "Donation failed");
+  
+            toast.success("Donation successful!");
+            navigate("/campaigns");
+          } catch (err: any) {
+            toast.error(err.message);
+          }
+        },
+        prefill: {
+          name: formData.name,
+          contact: formData.contact,
+        },
+        theme: {
+          color: "#007BFF",
+        },
+      };
+  
+      if ((window as any).Razorpay) {
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        toast.error("Razorpay failed to load.");
+      }
+    };
+  
+    document.body.appendChild(script);
   };
+  
 
   return (
     <div className="min-h-screen flex flex-col">
